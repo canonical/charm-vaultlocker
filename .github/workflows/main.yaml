@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: python3 -m pip install tox tox-uv
+
+      - name: Run linters
+        run: tox -e lint
+
+  unit-test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: python3 -m pip install tox tox-uv
+
+      - name: Run tests
+        run: tox -e unit
+
+  build:
+    name: Build charm
+    needs:
+      - lint
+      - unit-test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup LXD
+        uses: canonical/setup-lxd@v1
+        with:
+          channel: 5.21/stable
+
+      - name: Install Charmcraft
+        run: sudo snap install charmcraft --classic --channel=latest/stable
+
+      - name: Pack charm
+        run: charmcraft pack -v
