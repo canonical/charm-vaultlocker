@@ -1,4 +1,4 @@
-# Copyright 2026 raven.kaur@canonical.com
+# Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 #
 # The integration tests use the Jubilant library and the pytest-jubilant plugin.

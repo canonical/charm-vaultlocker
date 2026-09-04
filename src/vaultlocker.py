@@ -1,4 +1,4 @@
-# Copyright 2026 raven.kaur@canonical.com
+# Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 """Functions for managing and interacting with the workload.

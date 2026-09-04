@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-# Copyright 2026 raven.kaur@canonical.com
+# Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Charm the application."""
+"""Vaultlocker charm."""
 
 import logging
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class VaultlockerCharm(ops.CharmBase):
-    """Charm the application."""
+    """Vaultlocker subordinate charm."""
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)

@@ -1,4 +1,4 @@
-# Copyright 2026 raven.kaur@canonical.com
+# Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 #
 # To learn more about testing, see https://canonical.com/juju/docs/ops/latest/explanation/testing/
@@ -17,7 +17,13 @@ def mock_get_version():
 def test_start(monkeypatch: pytest.MonkeyPatch):
     """Test that the charm has the correct state after handling the start event."""
     # Arrange:
-    ctx = testing.Context(VaultlockerCharm)
+    ctx = testing.Context(
+        VaultlockerCharm,
+        meta={
+            "name": "vaultlocker",
+            "subordinate": True,
+        },
+    )
     monkeypatch.setattr("charm.vaultlocker.get_version", mock_get_version)
     # Act:
     state_out = ctx.run(ctx.on.start(), testing.State())
