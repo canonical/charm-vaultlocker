@@ -7,16 +7,21 @@
 
 import configparser
 import json
+from unittest import mock
 
 from ops import testing
 
 import vaultlocker
-from charm import NONCE_SECRET_LABEL
+from charm import NONCE_SECRET_LABEL, VaultlockerCharm
 
+DEVICE_TARGET = "/dev/disk/by-id/device-a"
 NONCE = "test-nonce"
-ACTIVE = testing.ActiveStatus("Vault integration ready")
-WAITING = testing.WaitingStatus("Waiting for Vault information")
-BLOCKED = testing.BlockedStatus("Missing vault-kv relation")
+VAULT_READY_STATUS = testing.ActiveStatus("Vault integration ready")
+WAITING_FOR_VAULT_STATUS = testing.WaitingStatus("Waiting for Vault information")
+MISSING_VAULT_RELATION_STATUS = testing.BlockedStatus("Missing vault-kv relation")
+INVALID_DEVICE_REQUESTS_STATUS = testing.BlockedStatus(
+    "Invalid encrypted-device requests from principal/0"
+)
 
 
 def vault_kv_nonce_secret():
@@ -57,6 +62,29 @@ def vault_kv_credentials_secret():
     )
 
 
+def encrypted_device_relation(
+    device_requests: str,
+) -> testing.SubordinateRelation:
+    """Return an encrypted-device relation containing unit requests."""
+    return testing.SubordinateRelation(
+        endpoint="encrypted-device",
+        remote_app_name="principal",
+        remote_unit_data={
+            "device_requests": device_requests,
+        },
+    )
+
+
+def create_vault_config_files():
+    """Create an existing Vaultlocker configuration  and ca file."""
+    config_dir = vaultlocker.CONFIG_PATH / "vaultlocker"
+    config_path = config_dir / "vaultlocker.conf"
+    ca_path = config_dir / "vault-ca.pem"
+    config_dir.mkdir(parents=True)
+    config_path.touch()
+    ca_path.touch()
+
+
 class TestVaultlockerCharm:
     """Test charm lifecycle and relation handling."""
 
@@ -67,7 +95,7 @@ class TestVaultlockerCharm:
         secret = state_out.get_secret(label=NONCE_SECRET_LABEL)
         assert secret.owner == "unit"
         assert secret.tracked_content["nonce"]
-        assert state_out.unit_status == BLOCKED
+        assert state_out.unit_status == MISSING_VAULT_RELATION_STATUS
 
     def test_vault_kv_joined_requests_credentials(self, ctx):
         """Joining Vault publishes the credential request and sets Waiting."""
@@ -86,7 +114,7 @@ class TestVaultlockerCharm:
         assert relation_out.local_unit_data["nonce"] == NONCE
         assert relation_out.local_unit_data["egress_subnet"] == "10.0.0.0/24"
         assert relation_out.local_app_data["mount_suffix"] == "keys"
-        assert state_out.unit_status == WAITING
+        assert state_out.unit_status == WAITING_FOR_VAULT_STATUS
 
     def test_vault_kv_complete_data_sets_active(self, ctx):
         """Ready reads the latest credentials and changes Waiting to Active."""
@@ -106,7 +134,7 @@ class TestVaultlockerCharm:
         state_in = testing.State(
             relations=[relation],
             secrets=[vault_kv_nonce_secret(), credentials],
-            unit_status=WAITING,
+            unit_status=WAITING_FOR_VAULT_STATUS,
         )
 
         state_out = ctx.run(
@@ -128,7 +156,7 @@ class TestVaultlockerCharm:
             "kv_version": "2",
             "ca_bundle": str(ca_path),
         }
-        assert state_out.unit_status == ACTIVE
+        assert state_out.unit_status == VAULT_READY_STATUS
 
     def test_vault_kv_subnet_change_updates_request(self, ctx):
         """A network change updates the Vault request using the existing nonce."""
@@ -138,7 +166,7 @@ class TestVaultlockerCharm:
             relations=[relation],
             networks=[network],
             secrets=[vault_kv_nonce_secret(), vault_kv_credentials_secret()],
-            unit_status=ACTIVE,
+            unit_status=VAULT_READY_STATUS,
         )
 
         state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -154,12 +182,12 @@ class TestVaultlockerCharm:
         state_in = testing.State(
             relations=[relation],
             secrets=[vault_kv_nonce_secret()],
-            unit_status=ACTIVE,
+            unit_status=VAULT_READY_STATUS,
         )
 
         state_out = ctx.run(ctx.on.relation_changed(relation, remote_unit=0), state_in)
 
-        assert state_out.unit_status == WAITING
+        assert state_out.unit_status == WAITING_FOR_VAULT_STATUS
 
     def test_vault_kv_broken_sets_blocked(self, ctx):
         """Removing Vault blocks a unit."""
@@ -167,12 +195,12 @@ class TestVaultlockerCharm:
         state_in = testing.State(
             relations=[relation],
             secrets=[vault_kv_nonce_secret()],
-            unit_status=ACTIVE,
+            unit_status=VAULT_READY_STATUS,
         )
 
         state_out = ctx.run(ctx.on.relation_broken(relation), state_in)
 
-        assert state_out.unit_status == BLOCKED
+        assert state_out.unit_status == MISSING_VAULT_RELATION_STATUS
 
     def test_vault_kv_credentials_changed_updates_config(self, ctx):
         """A new credential revision updates the Vaultlocker configuration."""
@@ -192,7 +220,7 @@ class TestVaultlockerCharm:
         state_in = testing.State(
             relations=[relation],
             secrets=[vault_kv_nonce_secret(), credentials],
-            unit_status=ACTIVE,
+            unit_status=VAULT_READY_STATUS,
         )
 
         state_out = ctx.run(ctx.on.secret_changed(credentials), state_in)
@@ -202,3 +230,104 @@ class TestVaultlockerCharm:
 
         assert config["vault"]["secret_id"] == "new-role-secret-id"
         assert state_out.get_secret(id=credentials.id).tracked_content == latest_credentials
+
+    def test_valid_encrypted_device_requests_are_accepted(self, ctx):
+        """A valid device request is accepted."""
+        vault_relation = ready_vault_kv_relation()
+        device_relation = encrypted_device_relation(json.dumps({DEVICE_TARGET: {}}))
+        create_vault_config_files()
+
+        state_in = testing.State(
+            relations=[vault_relation, device_relation],
+            secrets=[
+                vault_kv_nonce_secret(),
+                vault_kv_credentials_secret(),
+            ],
+            unit_status=VAULT_READY_STATUS,
+        )
+
+        state_out = ctx.run(
+            ctx.on.relation_changed(
+                device_relation,
+                remote_unit=0,
+            ),
+            state_in,
+        )
+
+        assert state_out.unit_status == VAULT_READY_STATUS
+
+    def test_invalid_encrypted_device_requests_set_blocked(self, ctx):
+        """Malformed device requests block without failing the hook."""
+        vault_relation = ready_vault_kv_relation()
+        device_relation = encrypted_device_relation("[]")
+        state_in = testing.State(
+            relations=[vault_relation, device_relation],
+            secrets=[
+                vault_kv_nonce_secret(),
+                vault_kv_credentials_secret(),
+            ],
+            unit_status=VAULT_READY_STATUS,
+        )
+
+        state_out = ctx.run(
+            ctx.on.relation_changed(
+                device_relation,
+                remote_unit=0,
+            ),
+            state_in,
+        )
+
+        assert state_out.unit_status == INVALID_DEVICE_REQUESTS_STATUS
+
+    def test_corrected_encrypted_device_requests_clear_blocked(self, ctx):
+        """Correcting device requests clears the invalid-request status."""
+        vault_relation = ready_vault_kv_relation()
+        device_relation = encrypted_device_relation(json.dumps({DEVICE_TARGET: {}}))
+        create_vault_config_files()
+
+        state_in = testing.State(
+            relations=[vault_relation, device_relation],
+            secrets=[
+                vault_kv_nonce_secret(),
+                vault_kv_credentials_secret(),
+            ],
+            unit_status=INVALID_DEVICE_REQUESTS_STATUS,
+        )
+
+        state_out = ctx.run(
+            ctx.on.relation_changed(
+                device_relation,
+                remote_unit=0,
+            ),
+            state_in,
+        )
+
+        assert state_out.unit_status == VAULT_READY_STATUS
+
+    def test_vault_ready_reconciles_pending_device_requests(self, ctx):
+        """Previously received device requests are retried after vault becomes ready."""
+        vault_relation = ready_vault_kv_relation()
+        device_relation = encrypted_device_relation(json.dumps({DEVICE_TARGET: {}}))
+        state_in = testing.State(
+            relations=[vault_relation, device_relation],
+            secrets=[
+                vault_kv_nonce_secret(),
+                vault_kv_credentials_secret(),
+            ],
+            unit_status=WAITING_FOR_VAULT_STATUS,
+        )
+
+        with mock.patch.object(
+            VaultlockerCharm,
+            "_reconcile_encrypted_device_requests",
+        ) as reconcile:
+            state_out = ctx.run(
+                ctx.on.relation_changed(
+                    vault_relation,
+                    remote_unit=0,
+                ),
+                state_in,
+            )
+
+        reconcile.assert_called_once()
+        assert state_out.unit_status == VAULT_READY_STATUS

@@ -19,7 +19,13 @@ def ctx(monkeypatch, tmp_path) -> testing.Context:
         VaultlockerCharm,
         meta={
             "name": "vaultlocker",
+            "subordinate": True,
             "requires": {
+                "encrypted-device": {
+                    "interface": "encrypted-device",
+                    "scope": "container",
+                    "limit": 1,
+                },
                 "vault-kv": {
                     "interface": "vault-kv",
                     "limit": 1,
