@@ -17,6 +17,7 @@ dependencies = [
     # PYDEPS of charms.vault_k8s.v0.vault_kv
     "pydantic",
     "pytest-interface-tester",
+    "vaultlocker-interfaces",
 ]
 
 [dependency-groups]
@@ -83,3 +84,11 @@ skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage"
 
 [tool.pyright]
 include = ["src", "tests"]
+
+[tool.uv.workspace]
+members = [
+    "packages/vaultlocker-interfaces",
+]
+
+[tool.uv.sources]
+vaultlocker-interfaces = { workspace = true }

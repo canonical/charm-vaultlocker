@@ -6,6 +6,12 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 
+[manifest]
+members = [
+    "vaultlocker",
+    "vaultlocker-interfaces",
+]
+
 [[package]]
 name = "annotated-types"
 version = "0.8.0"
@@ -577,6 +583,7 @@ dependencies = [
     { name = "ops" },
     { name = "pydantic" },
     { name = "pytest-interface-tester" },
+    { name = "vaultlocker-interfaces" },
 ]
 
 [package.dev-dependencies]
@@ -601,6 +608,7 @@ requires-dist = [
     { name = "ops", specifier = "~=3.7" },
     { name = "pydantic" },
     { name = "pytest-interface-tester" },
+    { name = "vaultlocker-interfaces", editable = "packages/vaultlocker-interfaces" },
 ]
 
 [package.metadata.requires-dev]
@@ -619,6 +627,17 @@ unit = [
     { name = "ops", extras = ["testing"] },
     { name = "pytest" },
 ]
+
+[[package]]
+name = "vaultlocker-interfaces"
+version = "0.1.0"
+source = { editable = "packages/vaultlocker-interfaces" }
+dependencies = [
+    { name = "ops" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "ops", specifier = "~=3.7" }]
 
 [[package]]
 name = "websocket-client"
