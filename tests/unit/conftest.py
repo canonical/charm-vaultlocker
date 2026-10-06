@@ -31,5 +31,13 @@ def ctx(monkeypatch, tmp_path) -> testing.Context:
                     "limit": 1,
                 },
             },
+            "config": {
+                "options": {
+                    "snap-channel": {
+                        "type": "string",
+                        "default": "latest/stable",
+                    },
+                },
+            },
         },
     )

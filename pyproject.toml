@@ -13,6 +13,7 @@ requires-python = ">=3.10"
 # 'charm-libs' block in charmcraft.yaml, run `charmcraft fetch-libs` to download the libraries,
 # then inspect the libraries for dependencies specified in PYDEPS. List those dependencies here.
 dependencies = [
+    "charmlibs-snap~=2.0",
     "ops~=3.7",
     # PYDEPS of charms.vault_k8s.v0.vault_kv
     "pydantic",

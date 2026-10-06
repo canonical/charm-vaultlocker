@@ -1,0 +1,44 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+type: charm
+name: encrypted-device-principal
+title: Encrypted device principal (test)
+summary: Test principal that provides the encrypted-device relation.
+description: |
+  Minimal principal charm used by vaultlocker integration tests to host
+  the vaultlocker subordinate and drive encrypted-device requests.
+
+base: ubuntu@24.04
+
+platforms:
+  amd64:
+  arm64:
+
+provides:
+  encrypted-device:
+    interface: encrypted-device
+
+actions:
+  publish-request:
+    description: Publish an encrypted-device request.
+    params:
+      target:
+        type: string
+        description: Stable device path.
+      existing-key-secret-id:
+        type: string
+        description: Optional Juju secret URI with the existing LUKS passphrase for enrollment.
+    required:
+      - target
+    additionalProperties: false
+  get-results:
+    description: Return the published device results.
+    additionalProperties: false
+
+parts:
+  charm:
+    plugin: uv
+    source: .
+    build-snaps:
+      - astral-uv

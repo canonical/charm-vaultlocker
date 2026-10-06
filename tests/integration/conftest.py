@@ -6,6 +6,7 @@
 
 import os
 import pathlib
+import subprocess
 
 import pytest
 
@@ -23,3 +24,19 @@ def charm():
     path = pathlib.Path(charm).resolve()
     assert path.is_file(), f"{path} is not a file"
     return path
+
+
+@pytest.fixture(scope="session")
+def principal_charm():
+    """Pack and return the encrypted-device principal test charm."""
+    principal_dir = pathlib.Path(__file__).parent / "principal"
+    subprocess.run(
+        ["charmcraft", "pack"],
+        cwd=principal_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    charms = list(principal_dir.glob("*.charm"))
+    assert len(charms) == 1, f"Expected one principal charm, found {charms}"
+    return charms[0].resolve()

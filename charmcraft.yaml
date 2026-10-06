@@ -37,6 +37,14 @@ charm-libs:
   - lib: vault_k8s.vault_kv
     version: "0"
 
+config:
+  options:
+    snap-channel:
+      type: string
+      default: "latest/stable"
+      description: |
+        Snap channel from which to install the vaultlocker snap.
+
 parts:
   charm:
     plugin: uv
